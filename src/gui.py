@@ -2,9 +2,14 @@
 
 import tkinter as tk
 from tkinter import messagebox
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from src.core import SEMI, VALORI
-from src.logic import genera_combinazioni, scegli_apertura, suggerisci_scarto
+from src.logic import genera_combinazioni, scegli_apertura
 from src.logic_log import suggerisci_scarto
+from tkinter import ttk
 
 from collections import defaultdict
 
@@ -55,8 +60,47 @@ def tutte_le_carte_ordinate_con_jolly():
 def avvia_gui():
     root = tk.Tk()
     root.title("Scala 40 – Seleziona la tua mano")
-    root.geometry("1200x900")
+    root.geometry("1200x1000")
     root.configure(bg=COLOR_BG)
+
+    fase_var = tk.StringVar(value="centrale")
+    carte_giocate = []
+
+    frame_fase = tk.LabelFrame(root, text="Fase della partita", bg=COLOR_FRAME, fg=COLOR_TEXT,
+                                font=("Segoe UI", 11, "bold"))
+    frame_fase.pack(padx=20, pady=5, fill="x")
+
+    for fase in ["inizio", "centrale", "finale"]:
+        tk.Radiobutton(frame_fase, text=fase.capitalize(), variable=fase_var, value=fase,
+                       bg=COLOR_FRAME, fg=COLOR_TEXT, font=("Segoe UI", 10),
+                       activebackground=COLOR_FRAME, activeforeground=COLOR_TEXT, selectcolor=COLOR_BG).pack(side="left", padx=10)
+
+    frame_giocate = tk.LabelFrame(root, text="Carte giocate dall'avversario", bg=COLOR_FRAME, fg=COLOR_TEXT,
+                                  font=("Segoe UI", 11, "bold"))
+    frame_giocate.pack(padx=20, pady=5, fill="x")
+
+    entry_giocate = tk.Entry(frame_giocate, font=("Segoe UI", 10))
+    entry_giocate.pack(side="left", padx=10)
+
+    def aggiorna_giocate():
+        nonlocal carte_giocate
+        testo = entry_giocate.get()
+        try:
+            giocate = testo.strip().split()
+            nuove = []
+            for g in giocate:
+                if len(g) >= 2:
+                    v = g[:-1]
+                    s = g[-1]
+                    if v in VALORI and s in [s for s, _ in SEMI_ALTERNATI]:
+                        nuove.append((v, s))
+            carte_giocate = nuove
+            messagebox.showinfo("Aggiornato", "Carte giocate aggiornate correttamente.")
+        except Exception as e:
+            messagebox.showerror("Errore", f"Formato non valido: {e}")
+
+    tk.Button(frame_giocate, text="Conferma giocate", command=aggiorna_giocate,
+              font=("Segoe UI", 10), bg=COLOR_BTN, fg="white").pack(side="left", padx=10)
 
     frame_disponibili = tk.LabelFrame(root, text="Carte disponibili", bg=COLOR_FRAME, fg=COLOR_TEXT,
                                       font=("Segoe UI", 11, "bold"))
@@ -136,7 +180,6 @@ def avvia_gui():
             carta = CartaGUI(frame_mano, valore, seme, lambda c, w=None, v=valore, s=seme: rimuovi_da_mano((v, s), None))
             carta.pack(side=tk.LEFT, padx=5, pady=5)
 
-    
     def suggerisci():
         if len(mano) != MAX_CARTE:
             messagebox.showerror("Errore", "Devi selezionare esattamente 13 carte.")
@@ -151,18 +194,16 @@ def avvia_gui():
 
         else:
             msg += f"✅ Apertura consigliata ({apertura['punti']} punti):"
-
             for c in apertura["combinazioni"]:
                 tipo = "Scala" if c["tipo"] == "scala" else "Tris"
                 descrizione = ", ".join([f"{v}{s}" if v != "JOLLY" else "★" for v, s in c["carte"]])
                 msg += f" - {tipo}: {descrizione}"
 
-
-        scarto, log = suggerisci_scarto(apertura["carte_rimaste"])
+        fase = fase_var.get()
+        scarto, log = suggerisci_scarto(apertura["carte_rimaste"], fase=fase, carte_giocate=carte_giocate)
         msg += f"\n🗑️ Scarto consigliato: {scarto[0]}{scarto[1]}\n\n"
         msg += "\n".join(log)
         aggiorna_info(msg)
-
 
     for riga_index, (carte, colore, seme_riga) in enumerate(righe_info):
         frame_riga = tk.Frame(frame_disponibili, bg=COLOR_ROW_UNIFORM)
